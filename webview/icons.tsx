@@ -15,6 +15,11 @@ export const IPATHS: Record<string, string> = {
   arrowDn: '<path d="M12 5v14M6 13l6 6 6-6"/>',
   dot: '<circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/>',
   chevR: '<path d="m9 6 6 6-6 6"/>',
+  chevD: '<path d="m6 9 6 6 6-6"/>',
+  edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+  newWin: '<path d="M14 3h7v7"/><path d="M21 3l-9 9"/><path d="M21 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6"/>',
+  diff: '<path d="M12 3v18M5 8l7-5 7 5M5 16l7 5 7-5"/>',
+  x: '<path d="M6 6l12 12M18 6 6 18"/>',
   folderOpen:
     '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2H3z"/><path d="M3 9h18l-2 9a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1z"/>'
 }

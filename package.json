@@ -2,12 +2,12 @@
   "name": "aurora-workspaces",
   "displayName": "Aurora Workspaces",
   "description": "Scan parent folders for git repositories and switch between them — the Aurora IDE workspace view, as a VS Code extension.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "aurora",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/aurora/aurora-ide"
+    "url": "https://github.com/dispiny/vscode-workspace-extensions"
   },
   "engines": {
     "vscode": "^1.84.0"

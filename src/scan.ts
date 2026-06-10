@@ -127,3 +127,41 @@ export async function scanRepos(root: string, depth = 5): Promise<RepoInfo[]> {
     .filter((r): r is RepoInfo => r !== null)
     .sort((a, b) => a.name.localeCompare(b.name))
 }
+
+export interface DiffFile {
+  path: string
+  index: string // staged status code
+  working: string // working-tree status code
+}
+export interface RepoDiff {
+  files: DiffFile[]
+  diff: string
+  truncated: boolean
+}
+
+const DIFF_MAX = 200_000
+
+// Read what changed in a repo (relative to HEAD) without opening any editor.
+export async function repoDiff(abs: string): Promise<RepoDiff> {
+  const git = simpleGit(abs)
+  const status = await git.status()
+  const files: DiffFile[] = status.files.map((f) => ({
+    path: f.path,
+    index: f.index,
+    working: f.working_dir
+  }))
+  let diff = ''
+  try {
+    // All tracked changes vs the last commit (staged + unstaged).
+    diff = await git.diff(['HEAD'])
+  } catch {
+    try {
+      diff = await git.diff()
+    } catch {
+      diff = ''
+    }
+  }
+  const truncated = diff.length > DIFF_MAX
+  if (truncated) diff = diff.slice(0, DIFF_MAX) + '\n… (이하 생략됨)'
+  return { files, diff, truncated }
+}

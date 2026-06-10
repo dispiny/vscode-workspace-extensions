@@ -1,6 +1,6 @@
 import * as vscode from 'vscode'
 import { basename } from 'path'
-import { scanRepos } from './scan'
+import { scanRepos, repoDiff } from './scan'
 
 interface Workspace {
   path: string
@@ -18,8 +18,8 @@ function nonce(): string {
 
 /**
  * Messages mirror the old Electron preload bridge (`window.aurora.scanRepos`, etc.).
- * webview -> host:  ready | scan | addWorkspace | removeWorkspace | openRepo
- * host -> webview:  workspaces | scanResult | scanError | refresh
+ * webview -> host:  ready | scan | addWorkspace | removeWorkspace | renameWorkspace | openRepo | repoDiff
+ * host -> webview:  workspaces | scanResult | scanError | refresh | repoDiff
  */
 class WorkspacesViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'auroraWorkspaces.view'
@@ -62,11 +62,42 @@ class WorkspacesViewProvider implements vscode.WebviewViewProvider {
         case 'removeWorkspace':
           await this.setWorkspaces(this.getWorkspaces().filter((w) => w.path !== msg.path))
           break
+        case 'renameWorkspace':
+          await this.renameWorkspace(String(msg.path))
+          break
         case 'openRepo':
-          await this.openRepo(String(msg.abs))
+          await this.openRepo(String(msg.abs), msg.newWindow as boolean | undefined)
+          break
+        case 'repoDiff':
+          await this.sendDiff(String(msg.abs))
           break
       }
     })
+  }
+
+  private async renameWorkspace(path: string): Promise<void> {
+    const list = this.getWorkspaces()
+    const ws = list.find((w) => w.path === path)
+    if (!ws) return
+    const name = await vscode.window.showInputBox({
+      title: '워크스페이스 이름 변경',
+      prompt: path,
+      value: ws.name,
+      validateInput: (v) => (v.trim() ? null : '이름을 입력하세요.')
+    })
+    if (name === undefined) return // cancelled
+    const trimmed = name.trim()
+    if (!trimmed || trimmed === ws.name) return
+    await this.setWorkspaces(list.map((w) => (w.path === path ? { ...w, name: trimmed } : w)))
+  }
+
+  private async sendDiff(abs: string): Promise<void> {
+    try {
+      const result = await repoDiff(abs)
+      this.post({ type: 'repoDiff', abs, ...result })
+    } catch (e) {
+      this.post({ type: 'repoDiff', abs, files: [], diff: '', truncated: false, error: String((e as Error)?.message || e) })
+    }
   }
 
   private async scan(path: string): Promise<void> {
@@ -96,12 +127,13 @@ class WorkspacesViewProvider implements vscode.WebviewViewProvider {
     await this.setWorkspaces(list)
   }
 
-  private async openRepo(abs: string): Promise<void> {
-    const newWindow = vscode.workspace
-      .getConfiguration('auroraWorkspaces')
-      .get<boolean>('openInNewWindow', true)
+  private async openRepo(abs: string, newWindow?: boolean): Promise<void> {
+    // An explicit choice from the UI wins; otherwise fall back to the config default.
+    const useNewWindow =
+      newWindow ??
+      vscode.workspace.getConfiguration('auroraWorkspaces').get<boolean>('openInNewWindow', true)
     await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(abs), {
-      forceNewWindow: newWindow
+      forceNewWindow: useNewWindow
     })
   }
 

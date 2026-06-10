@@ -1,27 +1,59 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { Icon, LANG_COLOR } from './icons'
-import { send, onHostMessage, RepoInfo, Workspace } from './bridge'
+import { send, onHostMessage, vscode, RepoInfo, Workspace, DiffFile } from './bridge'
 
 interface WSState {
   scanning: boolean
   repos: RepoInfo[]
   error?: string
 }
+interface DiffState {
+  repo: { abs: string; name: string }
+  loading: boolean
+  files: DiffFile[]
+  diff: string
+  truncated: boolean
+  error?: string
+}
+interface UIState {
+  collapsed?: Record<string, boolean>
+}
 
-function RepoCard({ r, delay, onOpen }: { r: RepoInfo; delay: number; onOpen: () => void }): React.JSX.Element {
+function RepoCard({
+  r,
+  delay,
+  onOpenCurrent,
+  onOpenNew,
+  onDiff
+}: {
+  r: RepoInfo
+  delay: number
+  onOpenCurrent: () => void
+  onOpenNew: () => void
+  onDiff: () => void
+}): React.JSX.Element {
+  const stop =
+    (fn: () => void) =>
+    (e: React.MouseEvent): void => {
+      e.stopPropagation()
+      fn()
+    }
   return (
     <div
       className="repo-card repo-card-click"
       style={{ animationDelay: delay + 'ms' }}
-      onClick={onOpen}
-      title="클릭하면 이 레포를 엽니다"
+      onClick={onOpenCurrent}
+      title="클릭하면 현재 창에서 엽니다"
     >
       <div className="repo-top">
         <span className="repo-ic" style={{ background: 'var(--hover)' }}>
           <Icon name="gitrepo" size={17} style={{ color: 'var(--accent)' }} />
         </span>
         <span className="repo-name">{r.name}</span>
+        <button className="card-btn" title="새 창에서 열기" onClick={stop(onOpenNew)}>
+          <Icon name="newWin" size={14} />
+        </button>
         <span className="branch-pill">
           <Icon name="branch" size={11} />
           <span>{r.branch}</span>
@@ -34,13 +66,16 @@ function RepoCard({ r, delay, onOpen }: { r: RepoInfo; delay: number; onOpen: ()
           {r.lang}
         </span>
         {r.dirty ? (
-          <span className="mi dirty"><Icon name="dot" size={10} /><b>{r.dirty}</b> 변경</span>
+          <button className="mi dirty mi-btn" title="변경사항 보기" onClick={stop(onDiff)}>
+            <Icon name="dot" size={10} />
+            <b>{r.dirty}</b> 변경
+          </button>
         ) : (
           <span className="mi clean"><Icon name="check" size={13} />정상</span>
         )}
         {r.ahead > 0 && <span className="mi"><Icon name="arrowUp" size={12} />{r.ahead}</span>}
         {r.behind > 0 && <span className="mi"><Icon name="arrowDn" size={12} />{r.behind}</span>}
-        <span className="mi open-hint" style={{ marginLeft: 'auto' }}>열기 <Icon name="chevR" size={12} /></span>
+        <span className="mi open-hint" style={{ marginLeft: 'auto' }}>현재 창에서 열기 <Icon name="chevR" size={12} /></span>
       </div>
       <div className="repo-commit">
         <span className="hash">{r.hash || '—'}</span>
@@ -51,11 +86,79 @@ function RepoCard({ r, delay, onOpen }: { r: RepoInfo; delay: number; onOpen: ()
   )
 }
 
+function DiffOverlay({ st, onClose }: { st: DiffState; onClose: () => void }): React.JSX.Element {
+  const lines = st.diff ? st.diff.split('\n') : []
+  function lineClass(l: string): string {
+    if (l.startsWith('+++') || l.startsWith('---')) return 'd-meta'
+    if (l.startsWith('@@')) return 'd-hunk'
+    if (l.startsWith('diff ') || l.startsWith('index ') || l.startsWith('new file') || l.startsWith('deleted file')) return 'd-meta'
+    if (l.startsWith('+')) return 'd-add'
+    if (l.startsWith('-')) return 'd-del'
+    return ''
+  }
+  return (
+    <div className="diff-overlay" onClick={onClose}>
+      <div className="diff-panel" onClick={(e) => e.stopPropagation()}>
+        <div className="diff-head">
+          <Icon name="diff" size={15} style={{ color: 'var(--accent)' }} />
+          <span className="diff-title">{st.repo.name}</span>
+          <span className="diff-sub">변경사항 (HEAD 기준)</span>
+          <button className="icon-btn" style={{ width: 28, height: 28, marginLeft: 'auto' }} title="닫기" onClick={onClose}>
+            <Icon name="x" size={15} />
+          </button>
+        </div>
+        {st.loading ? (
+          <div className="scan-spin" style={{ padding: 20 }}>
+            <span className="spinner" /> diff 계산 중…
+          </div>
+        ) : st.error ? (
+          <div className="ws-note" style={{ padding: 20 }}>오류: {st.error}</div>
+        ) : (
+          <>
+            {st.files.length > 0 && (
+              <div className="diff-files">
+                {st.files.map((f) => (
+                  <div key={f.path} className="diff-file">
+                    <span className={'d-stat s-' + (f.working || f.index).trim()}>{(f.index + f.working).trim() || '·'}</span>
+                    <span className="d-fpath">{f.path}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {lines.length ? (
+              <pre className="diff-pre">
+                {lines.map((l, i) => (
+                  <div key={i} className={lineClass(l)}>{l || ' '}</div>
+                ))}
+              </pre>
+            ) : (
+              <div className="ws-note" style={{ padding: 20 }}>
+                추적된 변경 내용이 없습니다{st.files.length ? ' (새 파일만 있을 수 있음).' : '.'}
+              </div>
+            )}
+            {st.truncated && <div className="ws-note" style={{ padding: '4px 16px 12px' }}>diff가 너무 커서 일부만 표시했습니다.</div>}
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function App(): React.JSX.Element {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
   const [results, setResults] = useState<Record<string, WSState>>({})
   const [q, setQ] = useState('')
   const [filter, setFilter] = useState('all')
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>(
+    () => (vscode.getState<UIState>()?.collapsed) ?? {}
+  )
+  const [diff, setDiff] = useState<DiffState | null>(null)
+  const diffAbs = useRef<string | null>(null)
+
+  // Persist collapse state across webview reloads.
+  useEffect(() => {
+    vscode.setState<UIState>({ collapsed })
+  }, [collapsed])
 
   // Wire up the host message bridge once.
   useEffect(() => {
@@ -76,11 +179,20 @@ function App(): React.JSX.Element {
             for (const k of Object.keys(next)) next[k] = { ...next[k], scanning: true }
             return next
           })
-          // re-scan everything
           setWorkspaces((ws) => {
             ws.forEach((w) => send({ type: 'scan', path: w.path }))
             return ws
           })
+          break
+        case 'repoDiff':
+          // Only apply if it's the diff we're currently looking at.
+          if (diffAbs.current === msg.abs) {
+            setDiff((d) =>
+              d
+                ? { ...d, loading: false, files: msg.files, diff: msg.diff, truncated: msg.truncated, error: msg.error }
+                : d
+            )
+          }
           break
       }
     })
@@ -91,6 +203,16 @@ function App(): React.JSX.Element {
   function scan(path: string): void {
     setResults((r) => ({ ...r, [path]: { scanning: true, repos: r[path]?.repos || [] } }))
     send({ type: 'scan', path })
+  }
+
+  function openDiff(abs: string, name: string): void {
+    diffAbs.current = abs
+    setDiff({ repo: { abs, name }, loading: true, files: [], diff: '', truncated: false })
+    send({ type: 'repoDiff', abs })
+  }
+
+  function toggleCollapse(path: string): void {
+    setCollapsed((c) => ({ ...c, [path]: !c[path] }))
   }
 
   // Scan any workspace we haven't scanned yet.
@@ -171,13 +293,20 @@ function App(): React.JSX.Element {
           workspaces.map((ws) => {
             const st = results[ws.path]
             const repos = (st?.repos || []).filter(matches)
+            const isCollapsed = !!collapsed[ws.path]
             return (
-              <div key={ws.path} className="ws-group" data-ws={ws.path}>
+              <div key={ws.path} className={'ws-group' + (isCollapsed ? ' collapsed' : '')} data-ws={ws.path}>
                 <div className="ws-group-head">
+                  <button className="ws-toggle" title={isCollapsed ? '펼치기' : '접기'} onClick={() => toggleCollapse(ws.path)}>
+                    <Icon name={isCollapsed ? 'chevR' : 'chevD'} size={15} />
+                  </button>
                   <Icon name="folderOpen" size={16} style={{ color: 'var(--accent)' }} />
-                  <span className="ws-name">{ws.name}</span>
+                  <span className="ws-name" onClick={() => toggleCollapse(ws.path)}>{ws.name}</span>
                   <span className="ws-path">{ws.path}</span>
                   <span className="ws-count">{st?.scanning ? '스캔 중…' : `${st?.repos.length ?? 0}개`}</span>
+                  <button className="icon-btn" style={{ width: 26, height: 26 }} title="이름 변경" onClick={() => send({ type: 'renameWorkspace', path: ws.path })}>
+                    <Icon name="edit" size={13} />
+                  </button>
                   <button className="icon-btn" style={{ width: 26, height: 26 }} title="새로고침" onClick={() => scan(ws.path)}>
                     <Icon name="refresh" size={14} />
                   </button>
@@ -190,7 +319,7 @@ function App(): React.JSX.Element {
                     <Icon name="trash" size={14} />
                   </button>
                 </div>
-                {st?.scanning ? (
+                {isCollapsed ? null : st?.scanning ? (
                   <div className="scan-spin" style={{ padding: '8px 2px 16px' }}>
                     <span className="spinner" />
                     <span style={{ fontFamily: 'var(--font-mono)' }}>{ws.path}</span> 에서 .git 검색 중…
@@ -200,7 +329,14 @@ function App(): React.JSX.Element {
                 ) : repos.length ? (
                   <div className="repo-grid">
                     {repos.map((r, i) => (
-                      <RepoCard key={r.abs} r={r} delay={i * 30} onOpen={() => send({ type: 'openRepo', abs: r.abs, name: r.name })} />
+                      <RepoCard
+                        key={r.abs}
+                        r={r}
+                        delay={i * 30}
+                        onOpenCurrent={() => send({ type: 'openRepo', abs: r.abs, name: r.name, newWindow: false })}
+                        onOpenNew={() => send({ type: 'openRepo', abs: r.abs, name: r.name, newWindow: true })}
+                        onDiff={() => openDiff(r.abs, r.name)}
+                      />
                     ))}
                   </div>
                 ) : (
@@ -213,6 +349,8 @@ function App(): React.JSX.Element {
           })
         )}
       </div>
+
+      {diff && <DiffOverlay st={diff} onClose={() => { diffAbs.current = null; setDiff(null) }} />}
     </div>
   )
 }
