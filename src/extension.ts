@@ -1,6 +1,7 @@
 import * as vscode from 'vscode'
 import { basename } from 'path'
 import { scanRepos, repoDiff } from './scan'
+import { checkForUpdates } from './update'
 
 interface Workspace {
   path: string
@@ -176,8 +177,11 @@ export function activate(context: vscode.ExtensionContext): void {
       webviewOptions: { retainContextWhenHidden: true }
     }),
     vscode.commands.registerCommand('auroraWorkspaces.addWorkspace', () => provider.addWorkspace()),
-    vscode.commands.registerCommand('auroraWorkspaces.refresh', () => provider.refresh())
+    vscode.commands.registerCommand('auroraWorkspaces.refresh', () => provider.refresh()),
+    vscode.commands.registerCommand('auroraWorkspaces.checkForUpdates', () => checkForUpdates(context, true))
   )
+  // Non-blocking automatic update check on startup.
+  void checkForUpdates(context)
 }
 
 export function deactivate(): void {}
