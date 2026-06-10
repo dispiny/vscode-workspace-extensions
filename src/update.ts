@@ -5,16 +5,6 @@ import { join } from 'path'
 
 const SKIP_KEY = 'aurora.skippedVersion'
 
-interface GhAsset {
-  name: string
-  browser_download_url: string
-}
-interface GhRelease {
-  tag_name: string
-  html_url: string
-  assets: GhAsset[]
-}
-
 // Parse "owner/repo" out of the package.json repository url.
 function repoSlug(context: vscode.ExtensionContext): string | null {
   const url: string | undefined = context.extension.packageJSON?.repository?.url
@@ -34,22 +24,33 @@ function isNewer(remote: string, local: string): boolean {
   return false
 }
 
-async function fetchLatest(slug: string): Promise<GhRelease | null> {
-  const res = await fetch(`https://api.github.com/repos/${slug}/releases/latest`, {
-    headers: { 'User-Agent': 'aurora-workspaces', Accept: 'application/vnd.github+json' }
+/**
+ * Find the highest released version via the releases Atom feed on github.com.
+ *
+ * We deliberately avoid api.github.com: its unauthenticated rate limit (60/hr per
+ * IP) is shared across a NAT/office IP and gets exhausted quickly, returning 403.
+ * The Atom feed is served by github.com and is not subject to that API limit.
+ */
+async function fetchLatestVersion(slug: string): Promise<string | null> {
+  const res = await fetch(`https://github.com/${slug}/releases.atom`, {
+    headers: { 'User-Agent': 'aurora-workspaces', Accept: 'application/atom+xml' }
   })
   if (!res.ok) return null
-  return (await res.json()) as GhRelease
+  const xml = await res.text()
+  const tags = [...xml.matchAll(/\/releases\/tag\/([^"<]+)/g)].map((m) => m[1])
+  if (!tags.length) return null
+  // Pick the highest version rather than trusting feed order.
+  return tags.reduce((best, t) => (isNewer(t, best) ? t : best)).replace(/^v/, '')
 }
 
-async function downloadAndInstall(asset: GhAsset, version: string): Promise<void> {
+async function downloadAndInstall(url: string, name: string, version: string): Promise<void> {
   await vscode.window.withProgress(
     { location: vscode.ProgressLocation.Notification, title: `Aurora Workspaces v${version} 업데이트 중…` },
     async () => {
-      const res = await fetch(asset.browser_download_url, { headers: { 'User-Agent': 'aurora-workspaces' } })
+      const res = await fetch(url, { headers: { 'User-Agent': 'aurora-workspaces' } })
       if (!res.ok) throw new Error(`다운로드 실패 (${res.status})`)
       const buf = Buffer.from(await res.arrayBuffer())
-      const tmp = join(tmpdir(), asset.name)
+      const tmp = join(tmpdir(), `${name}-${version}.vsix`)
       await fs.writeFile(tmp, buf)
       // Built-in command: installs an extension from a local .vsix file.
       await vscode.commands.executeCommand('workbench.extensions.installExtension', vscode.Uri.file(tmp))
@@ -79,19 +80,19 @@ export async function checkForUpdates(context: vscode.ExtensionContext, manual =
     return
   }
   const current: string = context.extension.packageJSON.version
-  let release: GhRelease | null = null
+  const name: string = context.extension.packageJSON.name
+  let latest: string | null = null
   try {
-    release = await fetchLatest(slug)
+    latest = await fetchLatestVersion(slug)
   } catch (e) {
     if (manual) vscode.window.showWarningMessage(`업데이트 확인 실패: ${String((e as Error)?.message || e)}`)
     return
   }
-  if (!release) {
+  if (!latest) {
     if (manual) vscode.window.showInformationMessage('릴리스를 찾을 수 없습니다.')
     return
   }
 
-  const latest = release.tag_name.replace(/^v/, '')
   if (!isNewer(latest, current)) {
     if (manual) vscode.window.showInformationMessage(`이미 최신 버전입니다 (v${current}).`)
     return
@@ -100,11 +101,8 @@ export async function checkForUpdates(context: vscode.ExtensionContext, manual =
   // Respect a previously skipped version (only for automatic checks).
   if (!manual && context.globalState.get<string>(SKIP_KEY) === latest) return
 
-  const vsix = release.assets.find((a) => a.name.endsWith('.vsix'))
-  if (!vsix) {
-    if (manual) vscode.window.showWarningMessage(`v${latest} 릴리스에 .vsix 파일이 없습니다.`)
-    return
-  }
+  // Release assets are named deterministically by vsce: `<name>-<version>.vsix`.
+  const url = `https://github.com/${slug}/releases/download/v${latest}/${name}-${latest}.vsix`
 
   const UPDATE = '업데이트'
   const SKIP = '이 버전 건너뛰기'
@@ -116,7 +114,7 @@ export async function checkForUpdates(context: vscode.ExtensionContext, manual =
   )
   if (choice === UPDATE) {
     try {
-      await downloadAndInstall(vsix, latest)
+      await downloadAndInstall(url, name, latest)
     } catch (e) {
       vscode.window.showErrorMessage(`업데이트 실패: ${String((e as Error)?.message || e)}`)
     }
