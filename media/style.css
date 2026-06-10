@@ -150,9 +150,17 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 .ws-group-head .ws-count { font-size: 11.5px; color: var(--text-2); background: var(--hover);
   border: 1px solid var(--hairline); border-radius: var(--r-pill); padding: 2px 9px; margin-left: auto; }
 .ws-note { color: var(--text-3); font-size: 12.5px; padding: 4px 2px 8px; }
-.repo-card-click { cursor: pointer; }
-.repo-meta .open-hint { color: var(--accent); font-weight: 600; opacity: 0; transition: opacity .15s; display: flex; align-items: center; gap: 2px; }
-.repo-card-click:hover .open-hint { opacity: 1; }
+
+/* open actions — two clearly-labeled buttons */
+.repo-actions { display: flex; gap: 8px; margin-top: 12px; }
+.open-btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+  height: 30px; padding: 0 10px; border-radius: var(--r-sm); font-size: 12px; font-weight: 600;
+  color: var(--text-2); background: var(--hover); border: 1px solid var(--hairline);
+  transition: background .12s, color .12s, border-color .12s; white-space: nowrap; }
+.open-btn:hover { background: var(--active); color: var(--text-1); }
+.open-btn.primary { color: #fff; background: var(--accent); border-color: transparent;
+  box-shadow: 0 1px 4px color-mix(in oklch, var(--accent) 45%, transparent); }
+.open-btn.primary:hover { filter: brightness(1.08); color: #fff; }
 
 /* collapse toggle */
 .ws-toggle { display: grid; place-items: center; width: 22px; height: 22px; border-radius: var(--r-xs);
@@ -161,11 +169,7 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 .ws-group-head .ws-name { cursor: pointer; }
 .ws-group-head .ws-name:hover { color: var(--accent); }
 
-/* card buttons (new window) */
-.card-btn { display: grid; place-items: center; width: 26px; height: 26px; border-radius: var(--r-sm);
-  color: var(--text-3); flex: none; opacity: 0; transition: opacity .15s, background .12s, color .12s; }
-.repo-card:hover .card-btn { opacity: 1; }
-.card-btn:hover { background: var(--hover); color: var(--accent); }
+/* changed-files badge acts as a button */
 .mi-btn { border: none; background: none; cursor: pointer; font: inherit; padding: 0; }
 .mi-btn:hover { filter: brightness(1.15); text-decoration: underline; }
 

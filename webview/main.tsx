@@ -40,20 +40,12 @@ function RepoCard({
       fn()
     }
   return (
-    <div
-      className="repo-card repo-card-click"
-      style={{ animationDelay: delay + 'ms' }}
-      onClick={onOpenCurrent}
-      title="클릭하면 현재 창에서 엽니다"
-    >
+    <div className="repo-card" style={{ animationDelay: delay + 'ms' }}>
       <div className="repo-top">
         <span className="repo-ic" style={{ background: 'var(--hover)' }}>
           <Icon name="gitrepo" size={17} style={{ color: 'var(--accent)' }} />
         </span>
         <span className="repo-name">{r.name}</span>
-        <button className="card-btn" title="새 창에서 열기" onClick={stop(onOpenNew)}>
-          <Icon name="newWin" size={14} />
-        </button>
         <span className="branch-pill">
           <Icon name="branch" size={11} />
           <span>{r.branch}</span>
@@ -75,12 +67,19 @@ function RepoCard({
         )}
         {r.ahead > 0 && <span className="mi"><Icon name="arrowUp" size={12} />{r.ahead}</span>}
         {r.behind > 0 && <span className="mi"><Icon name="arrowDn" size={12} />{r.behind}</span>}
-        <span className="mi open-hint" style={{ marginLeft: 'auto' }}>현재 창에서 열기 <Icon name="chevR" size={12} /></span>
       </div>
       <div className="repo-commit">
         <span className="hash">{r.hash || '—'}</span>
         <span className="cmsg">{r.msg || '커밋 없음'}</span>
         <span className="cwhen">{r.when}</span>
+      </div>
+      <div className="repo-actions">
+        <button className="open-btn primary" onClick={stop(onOpenCurrent)}>
+          <Icon name="window" size={13} />현재 창에서 열기
+        </button>
+        <button className="open-btn" onClick={stop(onOpenNew)}>
+          <Icon name="newWin" size={13} />새 창에서 열기
+        </button>
       </div>
     </div>
   )
