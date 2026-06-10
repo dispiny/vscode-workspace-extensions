@@ -20,6 +20,9 @@ interface UIState {
   collapsed?: Record<string, boolean>
 }
 
+// Which surface are we rendering in — set by the host in the HTML shell.
+const IN_EDITOR = (window as unknown as { __AURORA_VIEW__?: string }).__AURORA_VIEW__ === 'editor'
+
 function RepoCard({
   r,
   delay,
@@ -250,6 +253,12 @@ function App(): React.JSX.Element {
               </span>
             )}
           </div>
+          {!IN_EDITOR && (
+            <button className="btn-ghost" title="에디터 탭에서 넓게 열기" onClick={() => send({ type: 'openInEditor' })}>
+              <Icon name="expand" size={14} />
+              확장해서 열기
+            </button>
+          )}
           <button className="btn-ghost" onClick={() => workspaces.forEach((w) => scan(w.path))}>
             <Icon name="refresh" size={14} />
             전체 새로고침
