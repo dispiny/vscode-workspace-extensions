@@ -9,6 +9,7 @@ interface Workspace {
 }
 
 const WS_KEY = 'aurora.workspaces'
+const FAV_KEY = 'aurora.favorites'
 
 function nonce(): string {
   let t = ''
@@ -24,8 +25,8 @@ function nonce(): string {
  *   - a full-width editor WebviewPanel ("확장해서 열기")
  *
  * Messages mirror the old Electron preload bridge (`window.aurora.scanRepos`, etc.).
- * webview -> host:  ready | scan | addWorkspace | removeWorkspace | renameWorkspace | openRepo | repoDiff | openInEditor
- * host -> webview:  workspaces | scanResult | scanError | refresh | repoDiff
+ * webview -> host:  ready | scan | addWorkspace | removeWorkspace | renameWorkspace | openRepo | repoDiff | openInEditor | toggleFavorite
+ * host -> webview:  workspaces | scanResult | scanError | refresh | repoDiff | favorites
  */
 class WorkspacesProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'auroraWorkspaces.view'
@@ -41,6 +42,17 @@ class WorkspacesProvider implements vscode.WebviewViewProvider {
   private async setWorkspaces(list: Workspace[]): Promise<void> {
     await this.context.globalState.update(WS_KEY, list)
     this.post({ type: 'workspaces', workspaces: list }) // broadcast to all attached views
+  }
+
+  private getFavorites(): string[] {
+    return this.context.globalState.get<string[]>(FAV_KEY, [])
+  }
+
+  private async toggleFavorite(abs: string): Promise<void> {
+    const favs = this.getFavorites()
+    const next = favs.includes(abs) ? favs.filter((f) => f !== abs) : [...favs, abs]
+    await this.context.globalState.update(FAV_KEY, next)
+    this.post({ type: 'favorites', favorites: next })
   }
 
   // Broadcast to every attached webview so the sidebar and the editor tab stay in sync.
@@ -65,6 +77,10 @@ class WorkspacesProvider implements vscode.WebviewViewProvider {
     switch (msg.type) {
       case 'ready':
         this.post({ type: 'workspaces', workspaces: this.getWorkspaces() })
+        this.post({ type: 'favorites', favorites: this.getFavorites() })
+        break
+      case 'toggleFavorite':
+        await this.toggleFavorite(String(msg.abs))
         break
       case 'scan':
         await this.scan(String(msg.path))

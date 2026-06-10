@@ -41,6 +41,7 @@ export type HostMessage =
   | { type: 'scanError'; path: string; error: string }
   | { type: 'refresh' }
   | { type: 'repoDiff'; abs: string; files: DiffFile[]; diff: string; truncated: boolean; error?: string }
+  | { type: 'favorites'; favorites: string[] }
 
 export function send(msg: Record<string, unknown> & { type: string }): void {
   vscode.postMessage(msg)

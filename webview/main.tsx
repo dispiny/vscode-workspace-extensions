@@ -26,15 +26,19 @@ const IN_EDITOR = (window as unknown as { __AURORA_VIEW__?: string }).__AURORA_V
 function RepoCard({
   r,
   delay,
+  isFav,
   onOpenCurrent,
   onOpenNew,
-  onDiff
+  onDiff,
+  onToggleFav
 }: {
   r: RepoInfo
   delay: number
+  isFav: boolean
   onOpenCurrent: () => void
   onOpenNew: () => void
   onDiff: () => void
+  onToggleFav: () => void
 }): React.JSX.Element {
   const stop =
     (fn: () => void) =>
@@ -49,6 +53,9 @@ function RepoCard({
           <Icon name="gitrepo" size={16} style={{ color: 'var(--accent)' }} />
         </span>
         <span className="repo-name">{r.name}</span>
+        <button className={'star-btn' + (isFav ? ' on' : '')} title={isFav ? '즐겨찾기 해제' : '즐겨찾기'} onClick={stop(onToggleFav)}>
+          <Icon name={isFav ? 'starOn' : 'star'} size={15} />
+        </button>
         <button className="newwin-btn" title="새 창에서 열기" onClick={stop(onOpenNew)}>
           <Icon name="newWin" size={14} />
         </button>
@@ -150,7 +157,9 @@ function App(): React.JSX.Element {
     () => (vscode.getState<UIState>()?.collapsed) ?? {}
   )
   const [diff, setDiff] = useState<DiffState | null>(null)
+  const [favorites, setFavorites] = useState<string[]>([])
   const diffAbs = useRef<string | null>(null)
+  const favSet = new Set(favorites)
 
   // Persist collapse state across webview reloads.
   useEffect(() => {
@@ -166,6 +175,9 @@ function App(): React.JSX.Element {
           break
         case 'scanResult':
           setResults((r) => ({ ...r, [msg.path]: { scanning: false, repos: msg.repos } }))
+          break
+        case 'favorites':
+          setFavorites(msg.favorites)
           break
         case 'scanError':
           setResults((r) => ({ ...r, [msg.path]: { scanning: false, repos: [], error: '스캔 실패 — 경로를 확인하세요.' } }))
@@ -222,10 +234,18 @@ function App(): React.JSX.Element {
 
   function matches(r: RepoInfo): boolean {
     if (q && !(r.name + r.lang + r.branch).toLowerCase().includes(q.toLowerCase())) return false
+    if (filter === 'fav') return favSet.has(r.abs)
     if (filter === 'dirty') return r.dirty > 0
     if (filter === 'ahead') return r.ahead > 0 || r.behind > 0
     if (filter === 'ci') return r.ci === 'err'
     return true
+  }
+
+  // Favorites float to the top, then alphabetical (scan already sorts by name).
+  function byFavorite(a: RepoInfo, b: RepoInfo): number {
+    const fa = favSet.has(a.abs) ? 0 : 1
+    const fb = favSet.has(b.abs) ? 0 : 1
+    return fa - fb
   }
 
   const totalRepos = workspaces.reduce((n, ws) => n + (results[ws.path]?.repos.length || 0), 0)
@@ -265,7 +285,7 @@ function App(): React.JSX.Element {
         </div>
         <div className="repos-meta-row">
           <div className="repos-filters" style={{ marginLeft: 0 }}>
-            {([['all', '전체'], ['dirty', '변경됨'], ['ahead', '동기화 필요'], ['ci', 'CI 실패']] as const).map(
+            {([['all', '전체'], ['fav', '즐겨찾기'], ['dirty', '변경됨'], ['ahead', '동기화 필요'], ['ci', 'CI 실패']] as const).map(
               ([id, label]) => (
                 <button key={id} className={'chip' + (filter === id ? ' on' : '')} onClick={() => setFilter(id)}>
                   {label}
@@ -295,7 +315,7 @@ function App(): React.JSX.Element {
         ) : (
           workspaces.map((ws) => {
             const st = results[ws.path]
-            const repos = (st?.repos || []).filter(matches)
+            const repos = (st?.repos || []).filter(matches).slice().sort(byFavorite)
             const isCollapsed = !!collapsed[ws.path]
             return (
               <div key={ws.path} className={'ws-group' + (isCollapsed ? ' collapsed' : '')} data-ws={ws.path}>
@@ -336,9 +356,11 @@ function App(): React.JSX.Element {
                         key={r.abs}
                         r={r}
                         delay={i * 30}
+                        isFav={favSet.has(r.abs)}
                         onOpenCurrent={() => send({ type: 'openRepo', abs: r.abs, name: r.name, newWindow: false })}
                         onOpenNew={() => send({ type: 'openRepo', abs: r.abs, name: r.name, newWindow: true })}
                         onDiff={() => openDiff(r.abs, r.name)}
+                        onToggleFav={() => send({ type: 'toggleFavorite', abs: r.abs })}
                       />
                     ))}
                   </div>

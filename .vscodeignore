@@ -1,8 +1,13 @@
+# Source & tooling — only dist/ + media/ ship in the vsix
 .vscode/**
+.github/**
 src/**
 webview/**
 node_modules/**
 esbuild.mjs
 tsconfig.json
+**/tsconfig*.json
 **/*.map
 .gitignore
+.vscodeignore
+package-lock.json
