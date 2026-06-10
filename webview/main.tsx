@@ -49,16 +49,16 @@ function RepoCard({
           <Icon name="gitrepo" size={16} style={{ color: 'var(--accent)' }} />
         </span>
         <span className="repo-name">{r.name}</span>
-        <span className="branch-pill">
-          <Icon name="branch" size={11} />
-          <span>{r.branch}</span>
-        </span>
         <button className="newwin-btn" title="새 창에서 열기" onClick={stop(onOpenNew)}>
           <Icon name="newWin" size={14} />
         </button>
       </div>
       <div className="repo-path">{r.abs}</div>
       <div className="repo-meta">
+        <span className="branch-pill" title={r.branch}>
+          <Icon name="branch" size={11} />
+          <span>{r.branch}</span>
+        </span>
         <span className="mi">
           <span className="lang-dot" style={{ background: LANG_COLOR[r.lang] || 'var(--text-3)' }} />
           {r.lang}

@@ -123,9 +123,10 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 .repo-ic { width: 32px; height: 32px; border-radius: var(--r-sm); flex: none; display: grid; place-items: center; }
 .repo-name { font-size: 14px; font-weight: 600; color: var(--text-1); letter-spacing: -0.015em;
   flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.branch-pill { display: flex; align-items: center; gap: 5px; font: 500 11px/1 var(--font-mono);
+.branch-pill { display: inline-flex; align-items: center; gap: 5px; font: 500 11px/1 var(--font-mono);
   color: var(--text-2); background: var(--hover); border: 1px solid var(--hairline);
-  padding: 4px 9px; border-radius: var(--r-pill); flex: none; max-width: 120px; }
+  padding: 4px 9px; border-radius: var(--r-pill); flex: none; max-width: 100%; min-width: 0; }
+.branch-pill svg { flex: none; }
 .branch-pill span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .repo-path { font: 11px/1 var(--font-mono); color: var(--text-3); margin: 2px 0 13px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
