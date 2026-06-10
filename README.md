@@ -1,0 +1,47 @@
+# Aurora Workspaces (VS Code extension)
+
+Aurora IDE의 **워크스페이스 탭**을 VS Code extension(Webview 방식)으로 옮긴 것입니다.
+부모 폴더를 등록하면 하위 git 레포지토리를 깊이 5까지 스캔해 카드로 모아 보여주고,
+카드를 클릭하면 해당 레포를 엽니다.
+
+## 구조 — 무엇이 그대로 옮겨졌나
+
+| 파일 | 출처 (aurora-ide) | 비고 |
+|---|---|---|
+| `src/scan.ts` | `src/main/ipc/git.ts` | `fast-glob` + `simple-git` 스캔 로직 **거의 무수정 이식** |
+| `webview/main.tsx` | `src/renderer/src/components/RepositoriesView.tsx` | React UI 이식. sidebar scroll-spy만 제거 |
+| `webview/icons.tsx` | `src/renderer/src/icons.tsx` + `data.ts` | 사용하는 아이콘·`LANG_COLOR`만 발췌 |
+| `media/style.css` | `src/renderer/src/aurora.css` | repo 뷰 관련 클래스 + 테마 변수 발췌 |
+| `src/extension.ts` | `src/main/index.ts` + `preload/index.ts` | Electron IPC → Webview `postMessage` 브리지로 대체 |
+
+## 통신 (Electron IPC → Webview 메시지)
+
+원래 `window.aurora.scanRepos(path)` (preload → `ipcMain.handle('git:scan')`)였던 부분이
+webview ↔ 확장 호스트 간 `postMessage` 프로토콜로 바뀌었습니다. 요청/응답 모양은 동일합니다.
+
+- webview → host: `ready` / `scan` / `addWorkspace` / `removeWorkspace` / `openRepo`
+- host → webview: `workspaces` / `scanResult` / `scanError` / `refresh`
+
+## 원본과 달라진 점
+
+- **레포 열기**: 원본은 내부 작업공간을 전환했지만, 여기서는 `vscode.openFolder`로 엽니다
+  (`auroraWorkspaces.openInNewWindow` 설정으로 새 창/현재 창 선택).
+- **워크스페이스 목록**: `context.globalState`에 저장되어 VS Code 창 전체에서 유지됩니다.
+- **전체 창 글래스 셸**: VS Code는 사이드바 패널에 한정되므로 카드 UI만 옮겼습니다.
+
+## 개발 / 실행
+
+```bash
+cd vscode-extension
+npm install
+npm run build          # 또는 npm run watch
+```
+
+그다음 VS Code에서 이 폴더를 열고 **F5** (Run Extension) → 새 Extension Development Host 창이 뜹니다.
+좌측 액티비티 바의 Aurora 아이콘 → "워크스페이스 추가"로 부모 폴더를 등록하세요.
+
+패키징:
+
+```bash
+npm run package        # vsce 필요: npm i -g @vscode/vsce
+```

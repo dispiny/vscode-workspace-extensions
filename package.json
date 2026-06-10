@@ -1,0 +1,104 @@
+{
+  "name": "aurora-workspaces",
+  "displayName": "Aurora Workspaces",
+  "description": "Scan parent folders for git repositories and switch between them — the Aurora IDE workspace view, as a VS Code extension.",
+  "version": "0.1.0",
+  "publisher": "aurora",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aurora/aurora-ide"
+  },
+  "engines": {
+    "vscode": "^1.84.0"
+  },
+  "categories": [
+    "SCM Providers",
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onView:auroraWorkspaces.view"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "auroraWorkspaces",
+          "title": "Aurora Workspaces",
+          "icon": "media/aurora.svg"
+        }
+      ]
+    },
+    "views": {
+      "auroraWorkspaces": [
+        {
+          "id": "auroraWorkspaces.view",
+          "name": "Repositories",
+          "type": "webview"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "auroraWorkspaces.addWorkspace",
+        "title": "Aurora: Add Workspace Folder",
+        "icon": "$(add)"
+      },
+      {
+        "command": "auroraWorkspaces.refresh",
+        "title": "Aurora: Refresh Repositories",
+        "icon": "$(refresh)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "auroraWorkspaces.addWorkspace",
+          "when": "view == auroraWorkspaces.view",
+          "group": "navigation@1"
+        },
+        {
+          "command": "auroraWorkspaces.refresh",
+          "when": "view == auroraWorkspaces.view",
+          "group": "navigation@2"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Aurora Workspaces",
+      "properties": {
+        "auroraWorkspaces.openInNewWindow": {
+          "type": "boolean",
+          "default": true,
+          "description": "Open a repository in a new window when clicked. If false, replaces the current window."
+        },
+        "auroraWorkspaces.scanDepth": {
+          "type": "number",
+          "default": 5,
+          "description": "How many directory levels deep to search for .git folders."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "vscode:prepublish": "node esbuild.mjs --production",
+    "package": "vsce package"
+  },
+  "dependencies": {
+    "fast-glob": "^3.3.2",
+    "simple-git": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "@types/vscode": "^1.84.0",
+    "esbuild": "^0.21.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "typescript": "^5.5.2"
+  }
+}
